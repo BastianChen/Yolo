@@ -41,9 +41,9 @@ class Trainer:
         return loss
 
     def train(self):
-        epoch = 1490
+        epoch = 1
         loss_new = 100
-        weight = 0.8
+        weight = 0.75
         while True:
             for labels_13, labels_26, labels_52, image_data in self.train_data:
                 image_data = image_data.to(self.device)

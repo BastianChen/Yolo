@@ -31,7 +31,7 @@ class Dataset(Dataset):
         boxes = np.split(boxes, len(boxes) // 5)
 
         for feature_size, anchors in cfg.ANCHORS_GROUP.items():
-            labels[feature_size] = np.zeros([feature_size, feature_size, 3, 5 + cfg.CLASS_NUM],dtype=np.float32)  # dtype=np.float32
+            labels[feature_size] = np.zeros([feature_size, feature_size, 3, 5 + cfg.CLASS_NUM], dtype=np.float32)
             for box in boxes:
                 center_x, center_y, w, h, cls = box
                 # 或者中心的的偏移量以及索引值

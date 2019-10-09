@@ -86,8 +86,8 @@ class Detector:
 
 if __name__ == '__main__':
     draw = Draw()
-    # detector = Detector("models/net.pth")
-    detector = Detector("models/net_0.8.pth")
+    detector = Detector("models/net.pth")
+    # detector = Detector("models/net_0.8.pth")
     image_array = os.listdir(cfg.IMAGE_PATH)
     for image_name in image_array:
         image = Image.open(os.path.join(cfg.IMAGE_PATH, image_name))
