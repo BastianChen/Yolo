@@ -32,7 +32,6 @@ class Detector:
         mask = torch.gt(input[..., 4], threshold)  # 1*13*13*3
         # 根据索引获取每个维度的所在维度，只要用于获取使用建议框的索引值
         indexs = torch.nonzero(mask)  # n*4
-        # print(indexs)
         # 根据索引获取详细值
         outputs = input[mask]  # n*15
         return indexs, outputs
@@ -44,7 +43,6 @@ class Detector:
 
         # 防止后面根据索引选出建议框时，因为类型不同而不能多个建议框同时选择，此时anchors的类型为list而索引值为tensor
         anchors = torch.Tensor(anchors)
-
         # 获取建议框的索引值
         feature_indexs = indexs[:, 3]
         # 获取置信度
@@ -80,14 +78,16 @@ class Detector:
             for i in range(cfg.CLASS_NUM):
                 boxes_nms = boxes_all[boxes_all[:, 5] == i]
                 if boxes_nms.size(0) > 0:
-                    result_box.append(NMS(boxes_nms, 0.3)[0])
+                    result_box.extend(NMS(boxes_nms, 0.3))
             return torch.stack(result_box)
 
 
 if __name__ == '__main__':
     draw = Draw()
-    detector = Detector("models/net.pth")
+    # detector = Detector("models/net.pth")
     # detector = Detector("models/net_0.8.pth")
+    detector = Detector("models/net_SGD.pth")
+    # detector = Detector("models/test.pth")
     image_array = os.listdir(cfg.IMAGE_PATH)
     for image_name in image_array:
         image = Image.open(os.path.join(cfg.IMAGE_PATH, image_name))

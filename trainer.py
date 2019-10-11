@@ -15,7 +15,8 @@ class Trainer:
         self.train_data = DataLoader(self.dataset, batch_size=3, shuffle=True)
         self.mse_loss = nn.MSELoss()
         self.cross_entropy_loss = nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.Adam(self.net.parameters())
+        # self.optimizer = torch.optim.Adam(self.net.parameters())
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
         if os.path.exists(self.net_path):
             self.net.load_state_dict(torch.load(self.net_path))
         self.net.train()
@@ -43,7 +44,7 @@ class Trainer:
     def train(self):
         epoch = 1
         loss_new = 100
-        weight = 0.75
+        weight = 0.7
         while True:
             for labels_13, labels_26, labels_52, image_data in self.train_data:
                 image_data = image_data.to(self.device)
