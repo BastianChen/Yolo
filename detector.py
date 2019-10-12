@@ -16,7 +16,7 @@ class Detector:
             transforms.ToTensor(),
             transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
         ])
-        self.net = MainNet()
+        self.net = MainNet().to(self.device)
         self.net.load_state_dict(torch.load(save_path))
         self.net.eval()
 
@@ -60,9 +60,12 @@ class Detector:
         return torch.stack([x1, y1, x2, y2, conf, cls.float()], dim=1)
 
     def detect(self, image, threshold, anchors):
-        image_data = self.trans(image)
+        image_data = self.trans(image).to(self.device)
         image_data = image_data.unsqueeze(dim=0)
         output_13, output_26, output_52 = self.net(image_data)
+        output_13 = output_13.cpu().detach()
+        output_26 = output_26.cpu().detach()
+        output_52 = output_52.cpu().detach()
         indexs_13, outputs_13 = self.filter(output_13, threshold)
         boxes_13 = self.backToImage(indexs_13, outputs_13, anchors[13], 32)
         indexs_26, outputs_26 = self.filter(output_26, threshold)
