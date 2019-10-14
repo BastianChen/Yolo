@@ -6,6 +6,8 @@ from net import MainNet
 import PIL.Image as Image
 from draw import Draw
 from utils import NMS
+import cv2
+import time
 
 
 class Detector:
@@ -93,7 +95,33 @@ if __name__ == '__main__':
     # detector = Detector("models/test.pth")
     image_array = os.listdir(cfg.IMAGE_PATH)
     for image_name in image_array:
-        image = Image.open(os.path.join(cfg.IMAGE_PATH, image_name))
-        box = detector.detect(image, 0.61, cfg.ANCHORS_GROUP)
-        print(box)
-        draw.draw(image, box)
+        # 处理多张图片
+        # start_time = time.time()
+        # image = Image.open(os.path.join(cfg.IMAGE_PATH, image_name))
+        # box = detector.detect(image, 0.61, cfg.ANCHORS_GROUP)
+        # print(box)
+        # draw.draw(image, box, None, False)
+        # end_time = time.time()
+        # print(end_time - start_time)
+
+        # 处理视频
+        cap = cv2.VideoCapture(r"F:\Project\Yolo V3\data\video\jj.mp4")
+        # fps = cap.get(cv2.CAP_PROP_FPS)
+        # print(fps)
+        while True:
+            ret, frame = cap.read()
+            if ret:
+                start_time = time.time()
+                # 将每一帧通道为BGR转换成RGB，用于后面将每一帧转换成图片
+                frames = frame[:, :, ::-1]
+                image = Image.fromarray(frames, 'RGB')
+                width, high = image.size
+                x_w = width / 416
+                y_h = high / 416
+                image_resize = image.resize((416, 416))
+                box = detector.detect(image_resize, 0.51, cfg.ANCHORS_GROUP)
+                # print(box)
+                draw.draw(image, box, frame, True, x_w, y_h)
+
+                end_time = time.time()
+                print(end_time - start_time)
