@@ -9,12 +9,12 @@ class MainNet(nn.Module):
         super().__init__()
         self.output_52 = nn.Sequential(
             ConvolutionalLayer(3, 32, 3, 1, 1),
-            DownsamplingLayer(32, 64),
+            DownSamplingLayer(32, 64),
             ResidualLayer(64),
-            DownsamplingLayer(64, 128),
+            DownSamplingLayer(64, 128),
             ResidualLayer(128),
             ResidualLayer(128),
-            DownsamplingLayer(128, 256),
+            DownSamplingLayer(128, 256),
             ResidualLayer(256),
             ResidualLayer(256),
             ResidualLayer(256),
@@ -25,7 +25,7 @@ class MainNet(nn.Module):
             ResidualLayer(256)
         )
         self.output_26 = nn.Sequential(
-            DownsamplingLayer(256, 512),
+            DownSamplingLayer(256, 512),
             ResidualLayer(512),
             ResidualLayer(512),
             ResidualLayer(512),
@@ -36,7 +36,7 @@ class MainNet(nn.Module):
             ResidualLayer(512),
         )
         self.output_13 = nn.Sequential(
-            DownsamplingLayer(512, 1024),
+            DownSamplingLayer(512, 1024),
             ResidualLayer(1024),
             ResidualLayer(1024),
             ResidualLayer(1024),
@@ -98,7 +98,7 @@ class ConvolutionalLayer(nn.Module):
 
 
 # 下采样层
-class DownsamplingLayer(nn.Module):
+class DownSamplingLayer(nn.Module):
     def __init__(self, input_channels, output_channels):
         super().__init__()
         self.layer = ConvolutionalLayer(input_channels, output_channels, 3, 2, 1)
@@ -121,9 +121,9 @@ class ResidualLayer(nn.Module):
     def __init__(self, input_channels):
         super().__init__()
         self.layer = nn.Sequential(
-            nn.Conv2d(input_channels, input_channels // 2, 1, 1, 0),
-            nn.Conv2d(input_channels // 2, input_channels // 2, 3, 1, 1),
-            nn.Conv2d(input_channels // 2, input_channels, 1, 1, 0)
+            ConvolutionalLayer(input_channels, input_channels // 2, 1, 1, 0),
+            ConvolutionalLayer(input_channels // 2, input_channels // 2, 3, 1, 1),
+            ConvolutionalLayer(input_channels // 2, input_channels, 1, 1, 0)
         )
 
     def forward(self, data):
