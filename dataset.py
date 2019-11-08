@@ -5,7 +5,7 @@ import PIL.Image as Image
 from torchvision import transforms
 import numpy as np
 import math
-from utils import one_hot
+from utils import one_hot, stack_cls
 
 
 class Dataset(Dataset):
@@ -29,12 +29,13 @@ class Dataset(Dataset):
         image_data = self.trans(Image.open(os.path.join(self.IMAGE_PATH, strs[0])))
         boxes = np.array([float(x) for x in strs[1:]])
         boxes = np.split(boxes, len(boxes) // 5)
+        boxes = stack_cls(np.stack(boxes))
 
         for feature_size, anchors in cfg.ANCHORS_GROUP.items():
             labels[feature_size] = np.zeros([feature_size, feature_size, 3, 5 + cfg.CLASS_NUM], dtype=np.float32)
             for box in boxes:
                 center_x, center_y, w, h, cls = box
-                # 或者中心的的偏移量以及索引值
+                # 获得中心的的偏移量以及索引值
                 offset_x, x_index = math.modf(center_x * feature_size / cfg.IMAGE_SIZE)
                 offset_y, y_index = math.modf(center_y * feature_size / cfg.IMAGE_SIZE)
                 for i, anchor in enumerate(anchors):
@@ -43,14 +44,16 @@ class Dataset(Dataset):
                     real_area = w * h  # 真实框的面积
                     conf = np.minimum(anchor_area, real_area) / np.maximum(anchor_area, real_area)
                     labels[feature_size][int(x_index), int(y_index), i] = np.array([offset_x, offset_y, p_w, p_h, conf,
-                                                                                    *one_hot(cfg.CLASS_NUM, int(cls))])
+                                                                                    *one_hot(cfg.CLASS_NUM, cls)])
         return labels[13], labels[26], labels[52], image_data
 
 
 if __name__ == '__main__':
     data = Dataset()
-    a, b, c, d = data[0]
-    mask = np.where(a[..., 4] > 0.5)
+    a, b, c, d = data[1]
+    mask = np.where(a[..., 4] > 0)
     print(a[mask])
-    print(a[10][7][2])
-    print(a[7][10][2])
+    print(b[mask])
+    print(c[mask])
+    # print(a[10][7][2])
+    # print(a[7][10][2])

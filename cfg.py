@@ -1,5 +1,7 @@
-IMAGE_PATH = "data/images"
-TEXT_PATH = "data/text/image_text"
+# IMAGE_PATH = "data/images"
+# TEXT_PATH = "data/text/image_text"
+IMAGE_PATH = "data/garbage_img"
+TEXT_PATH = "data/text/garbage_text"
 
 CLASS_NUM = 10
 
