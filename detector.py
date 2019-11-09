@@ -8,6 +8,7 @@ from draw import Draw
 from utils import NMS
 import cv2
 import time
+from yolov3_tiny import TinyNet
 
 
 class Detector:
@@ -18,7 +19,8 @@ class Detector:
             transforms.ToTensor(),
             transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
         ])
-        self.net = MainNet().to(self.device)
+        # self.net = MainNet().to(self.device)  # yolov3
+        self.net = TinyNet().to(self.device)  # yolov3-tiny
         self.net.load_state_dict(torch.load(save_path))
         self.net.eval()
 
@@ -67,17 +69,27 @@ class Detector:
     def detect(self, image, threshold, anchors):
         image_data = self.trans(image).to(self.device)
         image_data = image_data.unsqueeze(dim=0)
-        output_13, output_26, output_52 = self.net(image_data)
+        # yolov3
+        # output_13, output_26, output_52 = self.net(image_data)
+        # output_13 = output_13.cpu().detach()
+        # output_26 = output_26.cpu().detach()
+        # output_52 = output_52.cpu().detach()
+        # indexs_13, outputs_13 = self.filter(output_13, threshold)
+        # boxes_13 = self.backToImage(indexs_13, outputs_13, anchors[13], 32)
+        # indexs_26, outputs_26 = self.filter(output_26, threshold)
+        # boxes_26 = self.backToImage(indexs_26, outputs_26, anchors[26], 16)
+        # indexs_52, outputs_52 = self.filter(output_52, threshold)
+        # boxes_52 = self.backToImage(indexs_52, outputs_52, anchors[52], 8)
+        # boxes_all = torch.cat((boxes_13, boxes_26, boxes_52), dim=0)
+        # yolov3-tiny
+        output_13, output_26 = self.net(image_data)
         output_13 = output_13.cpu().detach()
         output_26 = output_26.cpu().detach()
-        output_52 = output_52.cpu().detach()
         indexs_13, outputs_13 = self.filter(output_13, threshold)
         boxes_13 = self.backToImage(indexs_13, outputs_13, anchors[13], 32)
         indexs_26, outputs_26 = self.filter(output_26, threshold)
         boxes_26 = self.backToImage(indexs_26, outputs_26, anchors[26], 16)
-        indexs_52, outputs_52 = self.filter(output_52, threshold)
-        boxes_52 = self.backToImage(indexs_52, outputs_52, anchors[52], 8)
-        boxes_all = torch.cat((boxes_13, boxes_26, boxes_52), dim=0)
+        boxes_all = torch.cat((boxes_13, boxes_26), dim=0)
         # 做NMS删除重叠框
         result_box = []
         if boxes_all.shape[0] == 0:
@@ -98,10 +110,11 @@ if __name__ == '__main__':
     # detector = Detector("models/net_SGD.pth")
     # detector = Detector("models/test.pth")
     # detector = Detector("models/net_SGD_without_normal.pth")
-    detector = Detector("models/net_Adam_with_normal.pth")  # 效果最好
+    # detector = Detector("models/net_Adam_with_normal.pth")  # 效果最好
     # detector = Detector("models/net_SGD_with_normal.pth")
     # detector = Detector("models/net_Adam_with_normal_new_net.pth") # 使用2层的残差块
     # detector = Detector("models/net_Adam_with_normal_old_net.pth")# 使用3层的残差块
+    detector = Detector("models/net_Adam_tiny_GroupNorm_net.pth")  # 使用GroupNorm代替BatchNorm,使用yolov3-tiny代替yolov3
     image_array = os.listdir(cfg.IMAGE_PATH)
     count = 1
     for image_name in image_array:
@@ -111,7 +124,7 @@ if __name__ == '__main__':
         img = Image.fromarray(image, "RGB")
         # image = Image.open(os.path.join(cfg.IMAGE_PATH, image_name))
         start_time = time.time()
-        box = detector.detect(img, 0.65, cfg.ANCHORS_GROUP)
+        box = detector.detect(img, 0.64, cfg.ANCHORS_GROUP)
         print(box)
         end_time = time.time()
         print(end_time - start_time)

@@ -124,8 +124,7 @@ class ResidualLayer(nn.Module):
         self.layer = nn.Sequential(
             ConvolutionalLayer(input_channels, input_channels // 2, 1, 1, 0),
             ConvolutionalLayer(input_channels // 2, input_channels // 2, 3, 1, 1),
-            ConvolutionalLayer(input_channels // 2, input_channels, 1, 1, 0),
-            # ConvolutionalLayer(input_channels // 2, input_channels, 3, 1, 1),
+            ConvolutionalLayer(input_channels // 2, input_channels, 1, 1, 0)
         )
 
     def forward(self, data):
@@ -151,33 +150,34 @@ class ConvolutionalSet(nn.Module):
 if __name__ == '__main__':
     data = torch.Tensor(1, 3, 416, 416).cuda()
     net = MainNet().cuda()
-    start = time.time()
-    for _ in range(1):
-        feature_13, feature_26, feature_52 = net(data)
-    end = time.time()
-    print("1:{}".format(end - start))
-    start = time.time()
-    for _ in range(10):
-        feature_13, feature_26, feature_52 = net(data)
-    end = time.time()
-    print("10:{}".format(end - start))
-    start = time.time()
-    for _ in range(100):
-        feature_13, feature_26, feature_52 = net(data)
-    end = time.time()
-    print("100:{}".format(end - start))
-    start = time.time()
-    for _ in range(1000):
-        feature_13, feature_26, feature_52 = net(data)
-    end = time.time()
-    print("1000:{}".format(end - start))
-    start = time.time()
-    for _ in range(5000):
-        feature_13, feature_26, feature_52 = net(data)
-    end = time.time()
-    print("5000:{}".format(end - start))
-    # print(feature_13.shape)
-    # print(feature_26.shape)
-    # print(feature_52.shape)
-    # params = sum([p.numel() for p in net.parameters()])
-    # print(params)
+    # start = time.time()
+    # for _ in range(1):
+    #     feature_13, feature_26, feature_52 = net(data)
+    # end = time.time()
+    # print("1:{}".format(end - start))
+    # start = time.time()
+    # for _ in range(10):
+    #     feature_13, feature_26, feature_52 = net(data)
+    # end = time.time()
+    # print("10:{}".format(end - start))
+    # start = time.time()
+    # for _ in range(100):
+    #     feature_13, feature_26, feature_52 = net(data)
+    # end = time.time()
+    # print("100:{}".format(end - start))
+    # start = time.time()
+    # for _ in range(1000):
+    #     feature_13, feature_26, feature_52 = net(data)
+    # end = time.time()
+    # print("1000:{}".format(end - start))
+    # start = time.time()
+    # for _ in range(5000):
+    #     feature_13, feature_26, feature_52 = net(data)
+    # end = time.time()
+    # print("5000:{}".format(end - start))
+    feature_13, feature_26, feature_52 = net(data)
+    print(feature_13.shape)
+    print(feature_26.shape)
+    print(feature_52.shape)
+    params = sum([p.numel() for p in net.parameters()])
+    print(params)
