@@ -7,9 +7,12 @@ import PIL.Image as pimg
 # 将标签中的类别转换成长度为cls_num的one-hot编码形式
 def one_hot(cls_num, indexs):
     result = np.zeros(cls_num)
-    for index in indexs:
-        index = np.array(index, dtype=np.int)
-        result[index] = 1
+    try:
+        for index in indexs:
+            index = np.array(index, dtype=np.int)
+            result[index] = 1
+    except:
+        result[int(indexs)] = 1
     return result
 
 
@@ -49,14 +52,6 @@ def NMS(boxes, threshold=0.3, method=1, sigma=0.5, isMin=False):
             boxes = boxes[(-boxes[:, 4]).argsort()]
     if boxes.shape[0] > 0:
         empty_boxes.append(boxes[0])
-    # while boxes.shape[0] > 1:
-    #     first_box = boxes[0]
-    #     other_boxes = boxes[1:]
-    #     empty_boxes.append(first_box)
-    #     index = torch.lt(IOU(first_box, other_boxes, isMin), threshold)
-    #     boxes = other_boxes[index]
-    # if boxes.shape[0] > 0:
-    #     empty_boxes.append(boxes[0])
     return torch.stack(empty_boxes)
 
 
@@ -74,26 +69,52 @@ def resize_img(source_path, save_path):
 
 # 重组有多重类别的样本
 def stack_cls(boxes):
-    first_box = boxes[0:1]
-    other_boxes = boxes[1:]
-    ouput_boxes = []
-    while other_boxes.shape[0] > 0:
-        index_array = first_box[:, 0:-1] == other_boxes[:, 0:-1]
-        # 获取和first_box中心点，宽高相同的索引
-        index_array = np.array(list(set(np.nonzero(index_array)[0])))
-        if index_array.shape[0] != 0:
-            # 获取相同box的cls值
-            cls = (other_boxes[index_array, 4])
-            # 删除重复的样本
-            other_boxes = np.delete(other_boxes, index_array, axis=0)
-            ouput_boxes.append([*first_box[0, 0:-1], (first_box[0, -1], *cls)])
-        else:
-            ouput_boxes.append([*first_box[0, 0:-1], (first_box[0, -1])])
-        first_box = other_boxes[0:1]
-        other_boxes = other_boxes[1:]
-    ouput_boxes = np.stack(ouput_boxes)
-    return ouput_boxes
-
+    if boxes.shape[0] > 1:
+        first_box = boxes[0:1]
+        other_boxes = boxes[1:]
+        ouput_boxes = []
+        while other_boxes.shape[0] > 0:
+            # 获取有重复框的索引
+            index_array = first_box[:, 0:-1] == other_boxes[:, 0:-1]
+            # 获取和first_box中心点，宽高相同的索引
+            index_array = np.array(list(set(np.nonzero(index_array)[0])))
+            if index_array.shape[0] != 0:
+                # 获取相同box的cls值
+                cls = (other_boxes[index_array, 4])
+                # 删除重复的样本
+                other_boxes = np.delete(other_boxes, index_array, axis=0)
+                ouput_boxes.append([*first_box[0, 0:-1], (first_box[0, -1], *cls)])
+            else:
+                ouput_boxes.append([*first_box[0, 0:-1], (first_box[0, -1])])
+                # 如果other_boxes的shape长度为1，那么还要把other_boxes中的那个box也加进来
+                if other_boxes.shape[0] == 1:
+                    ouput_boxes.append([*other_boxes[0, 0:-1], (other_boxes[0, -1])])
+            first_box = other_boxes[0:1]
+            other_boxes = other_boxes[1:]
+        ouput_boxes = np.stack(ouput_boxes)
+        return ouput_boxes
+    else:
+        return boxes
+# def stack_cls(boxes):
+#     first_box = boxes[0:1]
+#     other_boxes = boxes[1:]
+#     ouput_boxes = []
+#     while other_boxes.shape[0] > 0:
+#         index_array = first_box[:, 0:-1] == other_boxes[:, 0:-1]
+#         # 获取和first_box中心点，宽高相同的索引
+#         index_array = np.array(list(set(np.nonzero(index_array)[0])))
+#         if index_array.shape[0] != 0:
+#             # 获取相同box的cls值
+#             cls = (other_boxes[index_array, 4])
+#             # 删除重复的样本
+#             other_boxes = np.delete(other_boxes, index_array, axis=0)
+#             ouput_boxes.append([*first_box[0, 0:-1], (first_box[0, -1], *cls)])
+#         else:
+#             ouput_boxes.append([*first_box[0, 0:-1], (first_box[0, -1])])
+#         first_box = other_boxes[0:1]
+#         other_boxes = other_boxes[1:]
+#     ouput_boxes = np.stack(ouput_boxes)
+#     return ouput_boxes
 
 if __name__ == '__main__':
     # data = torch.Tensor([

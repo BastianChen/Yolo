@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 loss_path = "data/loss"
-loss_txt_array = os.listdir(loss_path)
+loss_txt_array = ["net_Adam_garbage_without_normal.txt", "net_Adam_garbage_with_normal.txt"]
 
 # 残差块2层
 new_loss = []
@@ -34,5 +34,5 @@ for i, filename in enumerate(loss_txt_array):
 # 画出两种网络的损失图
 plt.plot(new_loss_array)
 plt.plot(old_loss_array)
-plt.legend(['two', 'three'], loc='upper right')
+plt.legend(['with', 'without'], loc='upper right')
 plt.show()

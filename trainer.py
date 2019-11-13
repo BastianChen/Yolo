@@ -24,16 +24,15 @@ class Trainer:
         # self.net = MainNet().to(self.device)  # yolov3
         self.net = TinyNet().to(self.device)  # yolov3-tiny
         self.dataset = Dataset()
-        self.train_data = DataLoader(self.dataset, batch_size=5, shuffle=True)
+        self.train_data = DataLoader(self.dataset, batch_size=5, shuffle=False)
         self.mse_loss = nn.MSELoss()
-        # self.cross_entropy_loss = nn.CrossEntropyLoss()
         self.bceloss = nn.BCELoss()
         self.optimizer = torch.optim.Adam(self.net.parameters())
         # self.optimizer = torch.optim.SGD(self.net.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
         if os.path.exists(self.net_path):
             self.net.load_state_dict(torch.load(self.net_path))
-        else:
-            self.net.apply(weight_init)
+        # else:
+        #     self.net.apply(weight_init)
         self.net.train()
 
     def get_loss(self, output, labels, weight):

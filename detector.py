@@ -53,6 +53,7 @@ class Detector:
         conf = outputs[:, 4]
         # 获取多个类别值以及所对应的索引
         value, cls_index = torch.topk(outputs[:, 5:], 2, dim=1)
+        # cls = torch.argmax(outputs[:, 5:], dim=1).float()
         # 根据中心点的索引值以及偏移量值获取中心点和宽高值
         center_x = (indexs[:, 1].float() + outputs[:, 0]) * scale
         center_y = (indexs[:, 2].float() + outputs[:, 1]) * scale
@@ -62,9 +63,12 @@ class Detector:
         # 计算得到真实框左上角和右下角的坐标值
         x1, y1 = center_x - 0.5 * w, center_y - 0.5 * h
         x2, y2 = x1 + w, y1 + h
+        # 多类别多标签中使用
         min_cls = torch.min(cls_index[:, 0].float(), cls_index[:, 1].float())
         max_cls = torch.max(cls_index[:, 0].float(), cls_index[:, 1].float())
         return torch.stack([x1, y1, x2, y2, conf, min_cls, max_cls], dim=1)
+        # 多类别单标签使用
+        # return torch.stack([x1, y1, x2, y2, conf, cls], dim=1)
 
     def detect(self, image, threshold, anchors):
         image_data = self.trans(image).to(self.device)
@@ -95,26 +99,27 @@ class Detector:
         if boxes_all.shape[0] == 0:
             return boxes_all
         else:
-            # 只根据前4个类别进行nms
+            # 只根据前4个类别进行nms,只适用于训练"data/garbage_img"路径下的图片
             for i in range(4):
+                # for i in range(10):
                 boxes_nms = boxes_all[boxes_all[:, 5] == i]
                 if boxes_nms.size(0) > 0:
-                    result_box.extend(NMS(boxes_nms, 0.3))
+                    result_box.extend(NMS(boxes_nms, 0.3, 2))
             return torch.stack(result_box)
 
 
 if __name__ == '__main__':
     draw = Draw()
-    # detector = Detector("models/net.pth")
-    # detector = Detector("models/net_0.8.pth")
-    # detector = Detector("models/net_SGD.pth")
-    # detector = Detector("models/test.pth")
-    # detector = Detector("models/net_SGD_without_normal.pth")
     # detector = Detector("models/net_Adam_with_normal.pth")  # 效果最好
     # detector = Detector("models/net_SGD_with_normal.pth")
     # detector = Detector("models/net_Adam_with_normal_new_net.pth") # 使用2层的残差块
     # detector = Detector("models/net_Adam_with_normal_old_net.pth")# 使用3层的残差块
-    detector = Detector("models/net_Adam_tiny_GroupNorm_net.pth")  # 使用GroupNorm代替BatchNorm,使用yolov3-tiny代替yolov3
+    # detector = Detector("models/net_Adam_tiny_GroupNorm_net.pth")  # 使用GroupNorm代替BatchNorm,使用yolov3-tiny代替yolov3
+    # detector = Detector("models/net_Adam_add_net.pth")  # 使用add代替cat
+    # detector = Detector("models/net_Adam_not_garbage.pth")  # 使用adam训练原样本
+    # detector = Detector("models/net_Adam_garbage.pth")  # 使用adam以及tiny网络训练垃圾分类样本
+    detector = Detector("models/net_Adam_garbage_new_stack_cls.pth")
+    # detector = Detector("models/net_Adam_garbage_old_stack_cls.pth")
     image_array = os.listdir(cfg.IMAGE_PATH)
     count = 1
     for image_name in image_array:

@@ -50,10 +50,15 @@ class Dataset(Dataset):
 
 if __name__ == '__main__':
     data = Dataset()
-    a, b, c, d = data[1]
-    mask = np.where(a[..., 4] > 0)
-    print(a[mask])
-    print(b[mask])
-    print(c[mask])
+
+    for i in range(5):
+        a, b, c, d = data[i]
+        mask_a = np.where(a[..., 4] > 0)
+        # mask_b = np.where(b[..., 4] > 0)
+        # mask_c = np.where(c[..., 4] > 0)
+        print(a[mask_a])
+        print()
+    # print(b[mask_b])
+    # print(c[mask_c])
     # print(a[10][7][2])
     # print(a[7][10][2])

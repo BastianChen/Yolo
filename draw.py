@@ -34,13 +34,12 @@ class Draw:
                 image_draw = ImageDraw.ImageDraw(image)
                 for item in box:
                     x1, y1, x2, y2, _, cls1, cls2 = item
+                    # x1, y1, x2, y2, _, cls1 = item
                     cls1 = int(cls1)
                     cls2 = int(cls2)
                     text = self.text_array[cls1] + "\n" + self.text_array[cls2]
-                    # image_draw.rectangle(xy=(x1, y1, x2, y2), outline=self.color_image[cls.int()], width=3)
                     image_draw.rectangle(xy=(x1, y1, x2, y2), outline=self.color_image[cls1], width=3)
                     image_draw.text((x1, y1 + 10), text, (255, 0, 0), font=self.font)
-                    # draw.rectangle(xy=(x1, y1, x2, y2), outline=color[cls], width=3)
                     image.save(r"C:\Users\Administrator\Desktop\garbage/detect-{}.jpg".format(count))
             image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
             cv2.namedWindow("YOLOv3", 0)
