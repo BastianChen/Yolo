@@ -2,7 +2,6 @@ import torch
 import cfg
 import os
 from torchvision import transforms
-from net import MainNet
 import PIL.Image as Image
 from draw import Draw
 from utils import NMS
@@ -19,7 +18,6 @@ class Detector:
             transforms.ToTensor(),
             transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
         ])
-        # self.net = MainNet().to(self.device)  # yolov3
         self.net = TinyNet().to(self.device)  # yolov3-tiny
         self.net.load_state_dict(torch.load(save_path))
         self.net.eval()
@@ -73,18 +71,6 @@ class Detector:
     def detect(self, image, threshold, anchors):
         image_data = self.trans(image).to(self.device)
         image_data = image_data.unsqueeze(dim=0)
-        # yolov3
-        # output_13, output_26, output_52 = self.net(image_data)
-        # output_13 = output_13.cpu().detach()
-        # output_26 = output_26.cpu().detach()
-        # output_52 = output_52.cpu().detach()
-        # indexs_13, outputs_13 = self.filter(output_13, threshold)
-        # boxes_13 = self.backToImage(indexs_13, outputs_13, anchors[13], 32)
-        # indexs_26, outputs_26 = self.filter(output_26, threshold)
-        # boxes_26 = self.backToImage(indexs_26, outputs_26, anchors[26], 16)
-        # indexs_52, outputs_52 = self.filter(output_52, threshold)
-        # boxes_52 = self.backToImage(indexs_52, outputs_52, anchors[52], 8)
-        # boxes_all = torch.cat((boxes_13, boxes_26, boxes_52), dim=0)
         # yolov3-tiny
         output_13, output_26 = self.net(image_data)
         output_13 = output_13.cpu().detach()
