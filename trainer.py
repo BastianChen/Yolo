@@ -4,7 +4,6 @@ from dataset import Dataset
 from net import MainNet
 from torch.utils.data import DataLoader
 import os
-from yolov3_tiny import TinyNet
 
 
 # 初始化参数为正太分布
@@ -21,8 +20,7 @@ class Trainer:
         self.net_path = net_path
         self.loss_text_name = net_path.split("/")[1].split(".")[0]
         self.text_path = "data/loss/{}.txt".format(self.loss_text_name)
-        # self.net = MainNet().to(self.device)  # yolov3
-        self.net = TinyNet().to(self.device)  # yolov3-tiny
+        self.net = MainNet().to(self.device)  # yolov3
         self.dataset = Dataset()
         self.train_data = DataLoader(self.dataset, batch_size=5, shuffle=False)
         self.mse_loss = nn.MSELoss()
@@ -63,13 +61,11 @@ class Trainer:
         for _ in range(10000):
             for i, (labels_13, labels_26, labels_52, image_data) in enumerate(self.train_data):
                 image_data = image_data.to(self.device)
-                # output_13, output_26, output_52 = self.net(image_data)
-                output_13, output_26 = self.net(image_data)
+                output_13, output_26, output_52 = self.net(image_data)
                 loss_13 = self.get_loss(output_13, labels_13, weight)
                 loss_26 = self.get_loss(output_26, labels_26, weight)
-                # loss_52 = self.get_loss(output_52, labels_52, weight)
-                # loss_total = loss_13 + loss_26 + loss_52
-                loss_total = loss_13 + loss_26
+                loss_52 = self.get_loss(output_52, labels_52, weight)
+                loss_total = loss_13 + loss_26 + loss_52
                 self.optimizer.zero_grad()
                 loss_total.backward()
                 self.optimizer.step()
