@@ -2,7 +2,7 @@ import torch
 import cfg
 import os
 from torchvision import transforms
-from net import MainNet
+from nets import MainNet
 import PIL.Image as Image
 from draw import Draw
 from utils import NMS

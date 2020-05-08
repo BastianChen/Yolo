@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from dataset import Dataset
-from net import MainNet
+from nets import MainNet
 from torch.utils.data import DataLoader
 import os
 
