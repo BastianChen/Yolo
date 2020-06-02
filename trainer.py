@@ -1,86 +1,87 @@
-import torch.nn as nn
-import torch
-from dataset import Dataset
-from nets import MainNet
-from torch.utils.data import DataLoader
+from __future__ import division
+
+# from models import *
+from nets import *
+from tool.augmentation import *
+from tool.datasets import *
+from tool.utils import *
+from tool.region_loss import *
+from tool.cfg import *
+
 import os
-
-
-# 初始化参数为正太分布
-def weight_init(m):
-    if isinstance(m, nn.Conv2d):
-        nn.init.normal_(m.weight)
-        if m.bias is not None:
-            nn.init.constant_(m.bias, 0)
-
-
-class Trainer:
-    def __init__(self, net_path):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.net_path = net_path
-        self.loss_text_name = net_path.split("/")[1].split(".")[0]
-        self.text_path = "data/loss/{}.txt".format(self.loss_text_name)
-        self.net = MainNet().to(self.device)  # yolov3
-        self.dataset = Dataset()
-        self.train_data = DataLoader(self.dataset, batch_size=5, shuffle=False)
-        self.mse_loss = nn.MSELoss()
-        self.bceloss = nn.BCELoss()
-        self.optimizer = torch.optim.Adam(self.net.parameters())
-        # self.optimizer = torch.optim.SGD(self.net.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
-        if os.path.exists(self.net_path):
-            self.net.load_state_dict(torch.load(self.net_path))
-        # else:
-        #     self.net.apply(weight_init)
-        self.net.train()
-
-    def get_loss(self, output, labels, weight):
-        labels = labels.to(self.device)
-        # 转成n*h*w*c
-        output = output.permute(0, 2, 3, 1)
-        # 转成n*h*w*3*cls_num
-        output = output.reshape(output.size(0), output.size(1), output.size(2), 3, -1)
-        # 训练正样本的中心点、宽高、置信度以及类别
-        indexs_positive = torch.gt(labels[..., 4], 0)
-        loss_positive_other = self.mse_loss(output[indexs_positive][:, 0:5], labels[indexs_positive][:, 0:5])
-        loss_positive_cls = self.bceloss(torch.sigmoid_(output[indexs_positive][:, 5:]), labels[indexs_positive][:, 5:])
-        loss_positive = loss_positive_other + loss_positive_cls
-
-        # 训练负样本的置信度
-        indexs_negative = torch.eq(labels[..., 4], 0)
-        loss_negative_conf = self.mse_loss(output[indexs_negative][:, 4], labels[indexs_negative][:, 4])
-
-        loss = weight * loss_positive + (1 - weight) * loss_negative_conf
-        return loss
-
-    def train(self):
-        epoch = 1
-        loss_new = 100
-        weight = 0.7
-        # 用于记录loss
-        file = open(self.text_path, "w+", encoding="utf-8")
-        for _ in range(10000):
-            for i, (labels_13, labels_26, labels_52, image_data) in enumerate(self.train_data):
-                image_data = image_data.to(self.device)
-                output_13, output_26, output_52 = self.net(image_data)
-                loss_13 = self.get_loss(output_13, labels_13, weight)
-                loss_26 = self.get_loss(output_26, labels_26, weight)
-                loss_52 = self.get_loss(output_52, labels_52, weight)
-                loss_total = loss_13 + loss_26 + loss_52
-                self.optimizer.zero_grad()
-                loss_total.backward()
-                self.optimizer.step()
-
-                print("第{0}轮,第{1}批,损失为:{2}".format(epoch, i, loss_total.item()))
-                file.write("{} {} {}\n".format(epoch, i, loss_total.item()))
-                file.flush()
-                if loss_total.item() < loss_new:
-                    loss_new = loss_total.item()
-                    torch.save(self.net.state_dict(), self.net_path)
-            epoch += 1
-
+import argparse
+import torch
+from torch.utils.data import DataLoader
+from torch.autograd import Variable
 
 if __name__ == '__main__':
-    a = torch.Tensor([[0.6875, 0.25, -0.23180161, -0.13036182, 0.69616858],
-                      [0.6875, 545, 0, -0.13036182, 0.69616858]])
-    print(torch.argmax(a, dim=1))
-    print(torch.nn.functional.sigmoid(a))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
+    parser.add_argument("--batch_size", type=int, default=1, help="size of each image batch")
+    parser.add_argument("--model_def", type=str, default="cfg/yolov4.cfg", help="path to model definition file")
+    parser.add_argument("--pretrained_weights", type=str, default="models/yolov4.weights",
+                        help="if specified starts from checkpoint model")
+    parser.add_argument("--n_cpu", type=int, default=4, help="number of cpu threads to use during batch generation")
+    parser.add_argument("--img_size", type=int, default=608, help="size of each image dimension")
+    parser.add_argument("--data_root", type=str,
+                        default=r"E:\XunLeiDownload\VOCtrainval_06-Nov-2007\VOCdevkit\VOC2007",
+                        help="The data directory")
+    parser.add_argument("--cfgfile", type=str, default="cfg/yolov4.cfg",
+                        help="The cfgfile directory")
+    opt = parser.parse_args()
+    net_opt = parse_cfg(opt.cfgfile)
+
+    # Initiate model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = Darknet(opt.model_def, is_train=True).to(device)
+
+    # If specified we start from checkpoint
+    if opt.pretrained_weights:
+        if opt.pretrained_weights.endswith(".pth"):
+            model.load_state_dict(torch.load(opt.pretrained_weights))
+        else:
+            model.load_weights(opt.pretrained_weights)
+
+    print(model)
+
+    # Get dataloader
+    train_dataset = VOCDetection(root=opt.data_root)
+    train_loader = DataLoader(train_dataset,
+                              batch_size=opt.batch_size,
+                              num_workers=2,
+                              shuffle=True,
+                              collate_fn=collater,
+                              pin_memory=True)
+
+    optimizer = torch.optim.Adam(model.parameters())
+
+    # region_loss = RegionLoss()
+    # loss_opt = net_opt[-1]
+    # anchors = loss_opt['anchors'].split(',')
+    # anchor_mask = loss_opt['mask'].split(',')
+    # region_loss.anchor_mask = [int(i) for i in anchor_mask]
+    # region_loss.anchors = [float(i) for i in anchors]
+    # region_loss.num_classes = int(loss_opt['classes'])
+    # region_loss.num_anchors = int(loss_opt['num'])
+    # region_loss.anchor_step = len(region_loss.anchors) // region_loss.num_anchors
+
+    mode_path = r'models/net.pth'
+    mode_save = r'models/net.pth'
+    # model.load_state_dict(torch.load(mode_save))
+    # model.load_weights(mode_path)
+
+    for epoch in range(opt.epochs):
+        model.train()
+        for batch_i, (imgs, targets) in enumerate(train_loader):
+            imgs = Variable(imgs.to(device))
+            targets = Variable(targets.to(device), requires_grad=False)
+
+            optimizer.zero_grad()
+            loss = model(imgs, targets)
+
+            # loss = region_loss(outputs, targets)
+            loss.backward()
+            optimizer.step()
+            print(epoch, loss.item())
+
+    torch.save(model.state_dict(), mode_save)

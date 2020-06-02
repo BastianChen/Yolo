@@ -1,150 +1,87 @@
-import torch
-import cfg
-import os
-from torchvision import transforms
-from nets import MainNet
-import PIL.Image as Image
-from draw import Draw
-from utils import NMS
-import cv2
+import sys
 import time
-from yolov3_tiny import TinyNet
+from PIL import Image, ImageDraw
+# from models.tiny_yolo import TinyYoloNet
+from tool.utils import *
+from nets import Darknet
+import cv2
+import os
+import json
 
 
-class Detector:
-    def __init__(self, save_path):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.draw = Draw()
-        self.trans = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-        ])
-        self.net = MainNet().to(self.device)  # yolov3
-        self.net.load_state_dict(torch.load(save_path))
-        self.net.eval()
+def detect(cfgfile, weightfile, image_file_path):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    m = Darknet(cfgfile)
+    # checkpoint = torch.load(weightfile)
+    # model_dict = m.state_dict()
+    # pretrained_dict = checkpoint
+    # keys = []
+    # for k, v in pretrained_dict.items():
+    #     keys.append(k)
+    # i = 0
+    # for k, v in model_dict.items():
+    #     if v.size() == pretrained_dict[keys[i]].size():
+    #         model_dict[k] = pretrained_dict[keys[i]]
+    #         i = i + 1
+    # m.load_state_dict(model_dict)
 
-    # 过滤置信度符合要求的框
-    def filter(self, input, threshold):
-        input = input.permute(0, 2, 3, 1)
-        input = input.reshape(input.size(0), input.size(1), input.size(2), 3, -1)
+    # m.load_state_dict(torch.load(weightfile))
+    # m.load_weights(weightfile)
 
-        # 置信度加sigmoid激活,将值压缩在0.5到0.7311之间,加快调置信度筛选框的速度
-        torch.sigmoid_(input[..., 4])
+    # m.print_network()
+    m.load_weights(weightfile)
+    print('Loading weights from %s... Done!' % (weightfile))
+    # print(m)
 
-        # 求出符合要求框所在的索引
-        mask = torch.gt(input[..., 4], threshold)  # 1*13*13*3
-        # 获取使用建议框的索引值,以及中心点的索引值
-        indexs = torch.nonzero(mask)  # n*4
-        # 根据索引获取详细值（中心点偏移量，宽高偏移量，置信度以及类别）
-        outputs = input[mask]  # n*15
-        return indexs, outputs
+    namesfile = 'data/coco.names'
 
-    # 边框回归
-    def backToImage(self, indexs, outputs, anchors, scale):
-        if indexs.shape[0] == 0:
-            return torch.Tensor([])
+    # use_cuda = 1
+    # if use_cuda:
+    #     m.cuda()
 
-        # 防止后面根据索引选出建议框时，因为类型不同而不能多个建议框同时选择，此时anchors的类型为list而索引值为tensor
-        anchors = torch.Tensor(anchors)
-        # 获取建议框的索引值
-        feature_indexs = indexs[:, 3]
-        # 获取置信度
-        conf = outputs[:, 4]
-        # 获取多个类别值以及所对应的索引
-        value, cls_index = torch.topk(outputs[:, 5:], 2, dim=1)
-        # cls = torch.argmax(outputs[:, 5:], dim=1).float()
-        # 根据中心点的索引值以及偏移量值获取中心点和宽高值
-        center_x = (indexs[:, 1].float() + outputs[:, 0]) * scale
-        center_y = (indexs[:, 2].float() + outputs[:, 1]) * scale
-        # 根据宽高的偏移量获取真实框的宽高
-        w = torch.exp(outputs[:, 2]) * anchors[feature_indexs, 0]
-        h = torch.exp(outputs[:, 3]) * anchors[feature_indexs, 1]
-        # 计算得到真实框左上角和右下角的坐标值
-        x1, y1 = center_x - 0.5 * w, center_y - 0.5 * h
-        x2, y2 = x1 + w, y1 + h
-        # 多类别多标签中使用
-        min_cls = torch.min(cls_index[:, 0].float(), cls_index[:, 1].float())
-        max_cls = torch.max(cls_index[:, 0].float(), cls_index[:, 1].float())
-        return torch.stack([x1, y1, x2, y2, conf, min_cls, max_cls], dim=1)
-        # 多类别单标签使用
-        # return torch.stack([x1, y1, x2, y2, conf, cls], dim=1)
+    m.to(device)
 
-    def detect(self, image, threshold, anchors):
-        image_data = self.trans(image).to(self.device)
-        image_data = image_data.unsqueeze(dim=0)
-        # yolov3
-        output_13, output_26, output_52 = self.net(image_data)
-        output_13 = output_13.cpu().detach()
-        output_26 = output_26.cpu().detach()
-        output_52 = output_52.cpu().detach()
-        indexs_13, outputs_13 = self.filter(output_13, threshold)
-        boxes_13 = self.backToImage(indexs_13, outputs_13, anchors[13], 32)
-        indexs_26, outputs_26 = self.filter(output_26, threshold)
-        boxes_26 = self.backToImage(indexs_26, outputs_26, anchors[26], 16)
-        indexs_52, outputs_52 = self.filter(output_52, threshold)
-        boxes_52 = self.backToImage(indexs_52, outputs_52, anchors[52], 8)
-        boxes_all = torch.cat((boxes_13, boxes_26, boxes_52), dim=0)
-        # 做NMS删除重叠框
-        result_box = []
-        if boxes_all.shape[0] == 0:
-            return boxes_all
-        else:
-            # 只根据前4个类别进行nms,只适用于训练"data/garbage_img"路径下的图片
-            for i in range(4):
-                # for i in range(10):
-                boxes_nms = boxes_all[boxes_all[:, 5] == i]
-                if boxes_nms.size(0) > 0:
-                    result_box.extend(NMS(boxes_nms, 0.3, 2))
-            return torch.stack(result_box)
+    image_name_list = os.listdir(image_file_path)
+    total_data_json = []
+    for image_name in image_name_list:
+        imgfile = os.path.join(image_file_path, image_name)
+        input_img = cv2.imread(imgfile)
+        # orig_img = Image.open(imgfile).convert('RGB')
+
+        start = time.time()
+        boxes, scale = do_detect(m, input_img, 0.5, 0.3, device)
+        finish = time.time()
+        # print('%s: Predicted in %f seconds.' % (imgfile, (finish - start)))
+
+        class_names = load_class_names(namesfile)
+
+        # draw_boxes(input_img,boxes,scale=scale)
+        # plot_boxes_cv2(input_img, boxes, r"C:\Users\fuy\Desktop\images\detect_train\{}".format(image_name),
+        #                class_names=class_names, scale=scale)
+        _, count, type_str = plot_boxes_cv2(input_img, boxes,
+                                            r"C:\Users\fuy\Desktop\car_detect\test\{}".format(image_name),
+                                            class_names=class_names, scale=scale)
+    #     # 将数据以json格式保存
+    #     data_dict = {
+    #         'image_name': image_name,
+    #         'count': count,
+    #         'type': type_str
+    #     }
+    #
+    #     data_json = json.dumps(data_dict)
+    #     total_data_json.append([data_json])
+    # with open(r"C:\Users\fuy\Desktop\car_detect\car.json", 'w', encoding='utf-8') as json_file:
+    #     json.dump(total_data_json, json_file, ensure_ascii=False)
 
 
 if __name__ == '__main__':
-    draw = Draw()
-    detector = Detector("models/net_Adam_with_normal.pth")  # 效果最好
-    # detector = Detector("models/net_SGD_with_normal.pth")
-    # detector = Detector("models/net_Adam_with_normal_new_net.pth") # 使用2层的残差块
-    # detector = Detector("models/net_Adam_with_normal_old_net.pth")# 使用3层的残差块
-    # detector = Detector("models/net_Adam_tiny_GroupNorm_net.pth")  # 使用GroupNorm代替BatchNorm,使用yolov3-tiny代替yolov3
-    # detector = Detector("models/net_Adam_add_net.pth")  # 使用add代替cat
-    # detector = Detector("models/net_Adam_not_garbage.pth")  # 使用adam训练原样本
-    # detector = Detector("models/net_Adam_garbage.pth")  # 使用adam以及tiny网络训练垃圾分类样本
-    # detector = Detector("models/net_Adam_garbage_new_stack_cls.pth")
-    # detector = Detector("models/net_Adam_garbage_old_stack_cls.pth")
-    image_array = os.listdir(cfg.IMAGE_PATH)
-    count = 1
-    for image_name in image_array:
-        # 处理多张图片
-        image = cv2.imread(os.path.join(cfg.IMAGE_PATH, image_name))
-        image = image[:, :, ::-1]
-        img = Image.fromarray(image, "RGB")
-        # image = Image.open(os.path.join(cfg.IMAGE_PATH, image_name))
-        start_time = time.time()
-        box = detector.detect(img, 0.61, cfg.ANCHORS_GROUP)
-        print(box)
-        end_time = time.time()
-        print(end_time - start_time)
-        # print(box)
-        draw.draw(img, box, None, False, count)
-        count += 1
-
-        # 处理视频
-        # cap = cv2.VideoCapture(r"F:\Project\Yolo V3\data\video\jj.mp4")
-        # # fps = cap.get(cv2.CAP_PROP_FPS)
-        # # print(fps)
-        # while True:
-        #     ret, frame = cap.read()
-        #     if ret:
-        #         start_time = time.time()
-        #         # 将每一帧通道为BGR转换成RGB，用于后面将每一帧转换成图片
-        #         frames = frame[:, :, ::-1]
-        #         image = Image.fromarray(frames, 'RGB')
-        #         width, high = image.size
-        #         x_w = width / 416
-        #         y_h = high / 416
-        #         image_resize = image.resize((416, 416))
-        #         box = detector.detect(image_resize, 0.51, cfg.ANCHORS_GROUP)
-        #         # print(box)
-        #         draw.draw(image, box, frame, True, x_w, y_h)
-        #
-        #         end_time = time.time()
-        #         print(end_time - start_time)
+    cfgfile = r'cfg/yolov4.cfg'
+    # weightfile = r'weight/net1.pth'
+    weightfile = r'weight/yolov4.weights'
+    # imgfile = r'data/test1.jpg'
+    # image_file_path = r"E:\XunLeiDownload\COCO2017\train\train2017"
+    image_file_path = r"C:\Users\fuy\Desktop\car_detect\original"
+    # image_name_list = os.listdir(image_file_path)
+    # for image_name in image_name_list:
+    #     imgfile = os.path.join(image_file_path, image_name)
+    detect(cfgfile, weightfile, image_file_path)

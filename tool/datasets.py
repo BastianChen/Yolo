@@ -202,7 +202,7 @@ class VOCDetection(Dataset):
 
 
 if __name__ == '__main__':
-    dataset_root = r'E:\XunLeiDownload\VOCtrainval_06-Nov-2007\VOCdevkit\VOC2007'
+    dataset_root = r'/disk_d/workspace/personalSpace/like_project/VOC_/VOCdevkit/VOC2007'
 
     train_dataset = VOCDetection(root=dataset_root)
     train_loader = DataLoader(train_dataset,
@@ -211,10 +211,6 @@ if __name__ == '__main__':
                               shuffle=True,
                               collate_fn=collater,
                               pin_memory=True)
-
-
     for idx, (images, targets) in enumerate(train_loader):
-        print(images.shape)
-        print(targets.shape)
-        print(targets[:, :20])
+        print(targets)
         break
